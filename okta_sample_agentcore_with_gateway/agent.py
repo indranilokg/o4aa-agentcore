@@ -96,35 +96,44 @@ def strands_agent_bedrock(payload, context):
         access_token = access_token.get("access_token", "")
     access_token = (access_token or "").strip()
     id_token = (payload.get("id_token") or "").strip()
-    # Use id_token for gateway operations (remote MCP adapter expects Bearer token on every request)
-    token = id_token
-    logger.info("user_input: %s", user_input)
-    logger.info("token length for gateway: %s", len(token) if token else 0)
+    token = id_token or access_token
+    if not token:
+        return "Authentication required. No id_token or access_token provided."
 
     if not HR_MCP_GATEWAY_URL:
         agent = Agent(model=model, tools=STATIC_TOOLS, system_prompt=DEFAULT_SYSTEM_PROMPT)
         response = agent(user_input)
         return response.message["content"][0]["text"]
 
-    if not token:
-        return "Authentication required. No id_token provided."
-
     try:
         mcp_client = MCPClient(lambda: create_streamable_http_transport(HR_MCP_GATEWAY_URL, token))
         with mcp_client:
             gateway_tools = get_full_tools_list(mcp_client)
-            logger.info("Dynamic tools from gateway: %s", [t.tool_name for t in gateway_tools])
             all_tools = STATIC_TOOLS + gateway_tools
             agent = Agent(
                 model=model,
                 tools=all_tools,
                 system_prompt=DEFAULT_SYSTEM_PROMPT,
             )
-            invocation_state = {"access_token": access_token, "id_token": id_token}
+            invocation_state = {"access_token": access_token or "", "id_token": id_token or ""}
             response = agent(user_input, invocation_state=invocation_state)
         return response.message["content"][0]["text"]
     except Exception as e:
         logger.exception("Gateway or agent error")
+        # Check this exception and its cause chain for 500 (e.g. MCPClientInitializationError -> HTTPStatusError)
+        err_parts = [str(e)]
+        exc = e
+        while getattr(exc, "__cause__", None) or getattr(exc, "__context__", None):
+            exc = getattr(exc, "__cause__", None) or getattr(exc, "__context__", None)
+            if exc:
+                err_parts.append(str(exc))
+        err_msg = " ".join(err_parts)
+        if "500" in err_msg or "Internal Server Error" in err_msg:
+            return (
+                "Gateway returned 500. Often caused by the interceptor Lambda failing or "
+                "missing config: ensure the Lambda is attached (ATTACH_INTERCEPTOR + GATEWAY_* in deploy), "
+                "X-ID-Token is allowlisted, passRequestHeaders is true, and check CloudWatch Logs for the Lambda."
+            )
         return f"Error: {e}"
 
 if __name__ == "__main__":

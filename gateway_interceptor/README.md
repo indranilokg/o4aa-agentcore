@@ -136,6 +136,16 @@ Your MCP **target** does **not** need to allowlist `Authorization` for propagati
 2. The MCP server should receive `Authorization: Bearer <id_token>` and return 200 instead of 401.
 3. Check CloudWatch Logs for the Lambda to confirm it receives `X-ID-Token` and returns the transformed request.
 
+## Troubleshooting 500 from the Gateway
+
+If the agent gets **500 Internal Server Error** when calling the Gateway (MCP URL), the failure is in the Gateway or the interceptor Lambda, not in the agent. Check:
+
+1. **Interceptor attached** – Gateway has an REQUEST interceptor with this Lambda (via deploy script with `ATTACH_INTERCEPTOR` and `GATEWAY_*` / `INTERCEPTOR_LAMBDA_ARN`, or via AWS CLI/console).
+2. **X-ID-Token allowlisted** – The Gateway is configured to pass `X-ID-Token` to the interceptor (e.g. “request headers to pass to interceptor”).
+3. **passRequestHeaders: true** – In `interceptorConfigurations[].inputConfiguration`, `passRequestHeaders` is `true` so the Lambda receives headers.
+4. **Lambda permission** – The Gateway (or its role) has `lambda:InvokeFunction` on this Lambda.
+5. **CloudWatch Logs** – In the Lambda’s log group, look for the event shape (e.g. missing `headers` or `X-ID-Token`), uncaught exceptions, or timeout. Adjust `lambda_function.py` if the event path for headers differs.
+
 ## Event shape (for debugging)
 
 If the Lambda does not receive headers, log `event` and adjust the token read logic. Typical shape:
