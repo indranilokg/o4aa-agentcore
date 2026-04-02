@@ -135,6 +135,11 @@
         <p>Internal chatbot for your organization</p>
     </div>
     <div class="login-card">
+        {% if oauth_error %}
+        <p style="margin:0 0 16px; padding:12px 14px; font-size:0.875rem; color:#991b1b; background:#fef2f2; border:1px solid #fecaca; border-radius:8px;">
+            Sign-in could not be completed. Try again, or check the app logs. If this keeps happening, the session cookie may be too large (tokens).
+        </p>
+        {% endif %}
         <p style="margin:0 0 8px; font-size:0.9375rem; color: var(--text-secondary);">Sign in with your company account to continue.</p>
         <div class="divider"></div>
         <a href="/login" class="login-btn">

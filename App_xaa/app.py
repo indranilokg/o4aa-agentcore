@@ -23,6 +23,9 @@ load_dotenv()
 app = Flask(__name__)
 app.secret_key = os.getenv("APP_SECRET_KEY", "your-secret-key-here")
 app.config['SESSION_COOKIE_SAMESITE'] = "Lax"
+# Render serves only HTTPS; Secure cookies persist correctly behind the proxy
+if (os.getenv("RENDER") or "").lower() == "true":
+    app.config["SESSION_COOKIE_SECURE"] = True
 # Render / other reverse proxies: trust X-Forwarded-* so url_for(..., _external=True) is https + public host
 app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_prefix=1)
 
@@ -114,7 +117,10 @@ def index():
     if 'profile' in session:
         return redirect('/chat')
     else:
-        return render_template("login.html")
+        return render_template(
+            "login.html",
+            oauth_error=request.args.get("oauth_error"),
+        )
 
 @app.route("/login")
 def login():
@@ -139,9 +145,8 @@ def callback():
     try:
 
         token = okta.authorize_access_token(redirect_uri=get_okta_callback_url())
-        print('token',token);
+        print('token', token)
 
-        session["access_token"] = token
         # Decode and check claims
         if token.get('access_token'):
             try:
@@ -178,41 +183,43 @@ def callback():
             'email': userinfo['email']
         }
         session['profile'] = user_profile
-        # Generate a unique session ID for DynamoDB storage
         session_id = str(uuid.uuid4())
         session['session_id'] = session_id
 
-        # Store the tokens
-        session['user'] = token
-        
-        # Store ID token separately for easy access
-        if "id_token" in token:
-            session["id_token"] = token["id_token"]
-            print("Stored ID token in session")
+        # Store only compact strings — the full OAuth dict + duplicate "user" blob exceeds browser cookie limits (~4KB)
+        # and the session silently fails to persist → /chat → /login → Okta → "too many redirects".
+        access_token_str = token.get("access_token") or ""
+        id_token_str = token.get("id_token") or ""
+        session["access_token"] = access_token_str
+        session["id_token"] = id_token_str
+        if access_token_str:
+            print("Stored access token in session (string)")
+        else:
+            print("No access token in OAuth response")
+        if id_token_str:
+            print("Stored ID token in session (string)")
         else:
             print("No ID token received")
-            
-        if "refresh_token" in token:
+        if token.get("refresh_token"):
             session["refresh_token"] = token["refresh_token"]
             print("Stored refresh token in session")
         else:
             print("No refresh token received")
-
-
 
         return redirect('/chat')
 
     except Exception as e:
         print(f"Error in callback: {str(e)}")
         session.clear()
-        return redirect('/login')
+        # Redirect to home, not /login — /login immediately sends users to Okta and can loop on repeated failures
+        return redirect("/?oauth_error=1")
 
 @app.route("/logout")
 def logout():
     """
     Handle user logout
     """
-    id_token = session.get("access_token", {}).get("id_token")
+    id_token = session.get("id_token")
     session.clear()
     if OKTA_ISSUER and id_token:
         return redirect(
