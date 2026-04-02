@@ -144,7 +144,7 @@ def callback():
     """
     try:
 
-        token = okta.authorize_access_token(redirect_uri=get_okta_callback_url())
+        token = okta.authorize_access_token()
         print('token', token)
 
         # Decode and check claims
