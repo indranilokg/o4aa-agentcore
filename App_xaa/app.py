@@ -11,6 +11,7 @@ from functools import wraps
 from flask import Flask, render_template, request, jsonify, redirect, url_for, session
 from authlib.integrations.flask_client import OAuth
 from dotenv import load_dotenv
+from werkzeug.middleware.proxy_fix import ProxyFix
 from bedrock_agentcore import BedrockAgentCoreApp
 
 
@@ -22,13 +23,22 @@ load_dotenv()
 app = Flask(__name__)
 app.secret_key = os.getenv("APP_SECRET_KEY", "your-secret-key-here")
 app.config['SESSION_COOKIE_SAMESITE'] = "Lax"
+# Render / other reverse proxies: trust X-Forwarded-* so url_for(..., _external=True) is https + public host
+app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_prefix=1)
 
 # Okta Configuration (OAuth + optional client credentials)
 OKTA_CLIENT_ID = os.getenv("OKTA_CLIENT_ID")
 OKTA_CLIENT_SECRET = os.getenv("OKTA_CLIENT_SECRET")
 OKTA_ISSUER = os.getenv("OKTA_ISSUER_RESOURCE")
-OKTA_CALLBACK_URL = os.getenv("OKTA_CALLBACK_URL", "http://127.0.0.1:8000/callback")
 OKTA_SCOPE = os.getenv("OKTA_SCOPE", "openid profile email")
+
+
+def get_okta_callback_url():
+    """OAuth redirect_uri sent to Okta. If OKTA_CALLBACK_URL is unset, derive from the incoming request (deployed HTTPS)."""
+    explicit = (os.getenv("OKTA_CALLBACK_URL") or "").strip()
+    if explicit:
+        return explicit
+    return url_for("callback", _external=True)
 
 
 # Agent Core Configuration
@@ -113,11 +123,11 @@ def login():
     """
     print('=== LOGIN REQUEST ===')
     print('Issuer:', OKTA_ISSUER)
-    print('Callback URL:', OKTA_CALLBACK_URL)
+    print('Callback URL:', get_okta_callback_url())
     print('===================')
     session.clear()
-    
-    redirect_response = okta.authorize_redirect(redirect_uri=OKTA_CALLBACK_URL)
+
+    redirect_response = okta.authorize_redirect(redirect_uri=get_okta_callback_url())
     print('Redirect URL:', redirect_response.headers.get('Location'))
     return redirect_response
 
@@ -128,7 +138,7 @@ def callback():
     """
     try:
 
-        token = okta.authorize_access_token()
+        token = okta.authorize_access_token(redirect_uri=get_okta_callback_url())
         print('token',token);
 
         session["access_token"] = token
