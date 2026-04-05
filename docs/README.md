@@ -2,9 +2,11 @@
 
 This folder contains architecture and sequence diagrams (Mermaid) and a whitepaper for two integration approaches that connect an AgentCore-hosted agent to an Okta Cross-App Access (XAA) protected MCP server.
 
-## Whitepaper
+## Whitepapers
 
-**[whitepaper-secure-agentcore-okta-xaa.md](whitepaper-secure-agentcore-okta-xaa.md)** — Describes both approaches, includes inline Mermaid diagrams (1A, 2A, sequence 1, sequence 2), and highlights important code segments.
+**[whitepaper-agentcore-okta-cross-app-access-mcp.md](whitepaper-agentcore-okta-cross-app-access-mcp.md)** — **Primary narrative:** business and functional view of **Okta securing agents on Bedrock AgentCore** (stakeholder outcomes, risk/compliance, two patterns with full Mermaid diagrams). Lighter on manual implementation; use companion below for code-level detail.
+
+**[whitepaper-secure-agentcore-okta-xaa.md](whitepaper-secure-agentcore-okta-xaa.md)** — Shorter companion: both approaches, inline diagrams, and more code-oriented snippets.
 
 ## Standalone diagrams
 
