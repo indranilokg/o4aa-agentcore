@@ -222,9 +222,19 @@ def logout():
     id_token = session.get("id_token")
     session.clear()
     if OKTA_ISSUER and id_token:
-        return redirect(
-            f"{OKTA_ISSUER}/v1/logout?id_token_hint={urllib.parse.quote(id_token)}&post_logout_redirect_uri={url_for('index', _external=True)}"
-        )
+        end_session_endpoint = None
+        try:
+            meta = okta.load_server_metadata()
+            end_session_endpoint = meta.get("end_session_endpoint")
+        except Exception:
+            pass
+        if not end_session_endpoint:
+            end_session_endpoint = f"{OKTA_ISSUER}/oauth2/v1/logout"
+        params = urllib.parse.urlencode({
+            "id_token_hint": id_token,
+            "post_logout_redirect_uri": url_for("index", _external=True),
+        })
+        return redirect(f"{end_session_endpoint}?{params}")
     return redirect(url_for('index'))
 
 @app.route("/chat", methods=["GET", "POST"])
