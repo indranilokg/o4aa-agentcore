@@ -237,6 +237,33 @@ def logout():
         return redirect(f"{end_session_endpoint}?{params}")
     return redirect(url_for('index'))
 
+def _decode_jwt_claims(token_str):
+    """Decode a JWT payload without verification using base64."""
+    import base64
+    try:
+        parts = token_str.split(".")
+        if len(parts) != 3:
+            return None
+        payload = parts[1]
+        padding = 4 - len(payload) % 4
+        if padding != 4:
+            payload += "=" * padding
+        decoded_bytes = base64.urlsafe_b64decode(payload)
+        return json.loads(decoded_bytes)
+    except Exception:
+        return None
+
+
+def _build_flow_trace(step_label, status="success", detail=None, children=None):
+    """Helper to build a flow trace node."""
+    node = {"label": step_label, "status": status}
+    if detail:
+        node["detail"] = detail
+    if children:
+        node["children"] = children
+    return node
+
+
 @app.route("/chat", methods=["GET", "POST"])
 @requires_auth
 def chat_page():
@@ -244,45 +271,42 @@ def chat_page():
     Main chat interface page - handles both displaying chat and processing messages
     """
     messages = session.get('chat_messages', [])
+    flow_trace = session.get('flow_trace')
 
     if request.method == "POST":
         user_message = request.form.get("message", "").strip()
 
         if user_message:
-            # Add user message to chat history
             messages.append({
                 "sender": "user",
                 "message": user_message,
                 "timestamp": "Just now"
             })
 
+            flow_steps = []
+
             try:
-                # Get the session ID from Flask session
-
-
-
-                # Get bearer token for Agent Core API (use access_token string)
                 bearer_token_obj = session.get("id_token")
                 bearer_token = bearer_token_obj.get("id_token") if isinstance(bearer_token_obj, dict) else bearer_token_obj
                 if not isinstance(bearer_token, str) or not bearer_token:
                     raise ValueError("Missing access token for Agent Core request")
 
-                # Prepare the API request
+                # --- Token debug info ---
+                id_token_raw = session.get("id_token", "")
+                id_token_decoded = _decode_jwt_claims(id_token_raw)
+
+                flow_steps.append(_build_flow_trace(
+                    "User sends prompt",
+                    detail=user_message[:80]
+                ))
+
                 if not isinstance(AGENT_RUNTIME_ARN, str) or not AGENT_RUNTIME_ARN.strip():
                     raise ValueError("AGENT_RUNTIME_ARN environment variable is not set")
 
-                # Get session ID
                 session_id = session.get('profile', {}).get('user_id', 'default-session')
-
-                # Construct API endpoint
                 agent_runtime_arn_encoded = urllib.parse.quote(AGENT_RUNTIME_ARN, safe="")
-
-                #agent_runtime_arn_encoded = urllib.parse.quote(AGENT_RUNTIME_ARN, safe='')
                 api_endpoint = f"https://bedrock-agentcore.us-east-2.amazonaws.com/runtimes/{agent_runtime_arn_encoded}/invocations?qualifier=DEFAULT"
 
-                print('api_endpoint',api_endpoint)
-                print('bearer_token',session['id_token'],)
-                # Prepare request body (AgentCore expects 'inputText' not 'prompt')
                 request_body = {
                     "prompt": user_message,
                     "id_token": session['id_token'],
@@ -290,32 +314,68 @@ def chat_page():
                     "sessionId": session_id
                 }
 
-
                 headers = {
                     "Authorization": f"Bearer {bearer_token}",
                     "Content-Type": "application/json"
                 }
 
-                # Send request to Agent Core
+                # Build ID token decoded claims as drill-down under Authorization
+                id_token_children = []
+                if id_token_decoded:
+                    highlight_keys = ['iss', 'sub', 'aud', 'email', 'name', 'exp', 'iat', 'nonce', 'amr', 'idp', 'auth_time']
+                    for k in highlight_keys:
+                        if k in id_token_decoded:
+                            id_token_children.append(_build_flow_trace(k, detail=str(id_token_decoded[k])))
+                    for k, v in id_token_decoded.items():
+                        if k not in highlight_keys:
+                            id_token_children.append(_build_flow_trace(k, detail=str(v)))
+                else:
+                    id_token_children.append(_build_flow_trace("Could not decode", status="error"))
+
+                flow_steps.append(_build_flow_trace(
+                    "Call AWS Bedrock AgentCore",
+                    detail=api_endpoint[:90] + "...",
+                    children=[
+                        _build_flow_trace("Endpoint", detail=api_endpoint),
+                        _build_flow_trace("Authorization: Bearer <id_token>",
+                            detail=f"JWT ({len(id_token_raw)} chars)",
+                            children=[
+                                _build_flow_trace("Raw JWT", detail=id_token_raw if id_token_raw else "N/A"),
+                                _build_flow_trace("Decoded Claims", children=id_token_children),
+                            ]
+                        ),
+                        _build_flow_trace("Body: sessionId", detail=session_id),
+                    ]
+                ))
+
+                req_start = time.time()
                 response = requests.post(
                     api_endpoint,
                     headers=headers,
-                    json=request_body,  # Use json= instead of data= for automatic serialization
+                    json=request_body,
                     timeout=30
                 )
+                req_duration_ms = int((time.time() - req_start) * 1000)
 
                 response.raise_for_status()
-                print('RAW RESPONSE TEXT:', response.text)
-                print('RESPONSE STATUS:', response.status_code)
+
                 try:
                     agent_response = response.json()
-                    print('RAW AGENT RESPONSE:', agent_response)
-                    print('RESPONSE TYPE:', type(agent_response))
                     response_text = extract_response_text(agent_response)
                 except Exception:
+                    agent_response = response.text
                     response_text = response.text
 
-                # Add agent response to chat history
+                flow_steps.append(_build_flow_trace(
+                    "AgentCore Response",
+                    detail=f"HTTP {response.status_code} in {req_duration_ms}ms",
+                    children=[
+                        _build_flow_trace("Status", detail=str(response.status_code)),
+                        _build_flow_trace("Latency", detail=f"{req_duration_ms}ms"),
+                        _build_flow_trace("Response preview", detail=response_text[:120] if response_text else "empty"),
+                    ]
+                ))
+
                 messages.append({
                     "sender": "agent",
                     "message": response_text,
@@ -323,34 +383,31 @@ def chat_page():
                 })
 
             except requests.exceptions.HTTPError as e:
-                print(f"HTTP Error: {e}")
-                print(f"Response text: {e.response.text if hasattr(e, 'response') else 'No response'}")
                 error_msg = f"Agent Core API error: {str(e)}"
-                if hasattr(e, 'response'):
+                if hasattr(e, 'response') and e.response is not None:
                     try:
                         error_detail = e.response.json()
                         error_msg += f" - {error_detail}"
-                    except:
+                    except Exception:
                         error_msg += f" - {e.response.text}"
-                messages.append({
-                    "sender": "system",
-                    "message": error_msg,
-                    "timestamp": "Just now"
-                })
+                flow_steps.append(_build_flow_trace("AgentCore Response", status="error", detail=error_msg))
+                messages.append({"sender": "system", "message": error_msg, "timestamp": "Just now"})
 
             except Exception as e:
-                print(f"Error in chat: {str(e)}")
                 error_msg = f"Internal error: {str(e)}"
-                messages.append({
-                    "sender": "system",
-                    "message": error_msg,
-                    "timestamp": "Just now"
-                })
+                flow_steps.append(_build_flow_trace("Error", status="error", detail=error_msg))
+                messages.append({"sender": "system", "message": error_msg, "timestamp": "Just now"})
 
-            # Save messages to session
+            flow_trace = flow_steps
             session['chat_messages'] = messages
+            session['flow_trace'] = flow_trace
 
-    return render_template("chat.html", user=session['profile'], messages=messages)
+    return render_template(
+        "chat.html",
+        user=session['profile'],
+        messages=messages,
+        flow_trace=flow_trace,
+    )
 
 @app.route("/clear-chat", methods=["POST"])
 @requires_auth

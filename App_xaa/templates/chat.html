@@ -4,426 +4,470 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Company Assistant</title>
-    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap">
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap">
     <style>
+        :root {
+            --bg-page: #f1f5f9;
+            --bg-card: #ffffff;
+            --bg-dark: #0f172a;
+            --bg-dark-2: #1e293b;
+            --bg-dark-3: #334155;
+            --text-primary: #0f172a;
+            --text-secondary: #64748b;
+            --text-light: #e2e8f0;
+            --text-muted: #94a3b8;
+            --border: #e2e8f0;
+            --primary: #3b82f6;
+            --primary-hover: #2563eb;
+            --success: #10b981;
+            --warn: #f59e0b;
+            --error: #ef4444;
+            --shadow: 0 4px 6px -1px rgba(0,0,0,0.07), 0 2px 4px -2px rgba(0,0,0,0.05);
+            --radius: 12px;
+            --radius-sm: 8px;
+            --mono: 'JetBrains Mono', 'SF Mono', 'Monaco', monospace;
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
         body {
-            font-family: 'Inter', sans-serif;
-            background: #f7f9fc;
-            margin: 0;
-            padding: 0;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: var(--bg-page);
+            color: var(--text-primary);
+            min-height: 100vh;
         }
         .main-container {
             display: flex;
-            max-width: 1600px;
-            margin: 20px auto;
-            gap: 20px;
-            padding: 0 20px;
-            align-items: flex-start;
+            max-width: 1800px;
+            margin: 0 auto;
+            height: 100vh;
         }
+
+        /* ===== CHAT ===== */
         .chat-container {
             flex: 1;
             min-width: 0;
-            background: #fff;
-            border-radius: 12px;
-            box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
-            overflow: hidden;
-        }
-        .side-panel {
-            width: 450px;
-            min-width: 450px;
-            background: #fff;
-            border-radius: 12px;
-            box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
-            transition: all 0.3s ease;
-            position: sticky;
-            top: 20px;
-        }
-        .side-panel.collapsed {
-            width: 60px;
-            min-width: 60px;
-        }
-        .side-panel-header {
-            background: #4a5568;
-            color: white;
-            padding: 15px 20px;
             display: flex;
-            justify-content: space-between;
-            align-items: center;
-            cursor: pointer;
-        }
-        .side-panel-content {
-            padding: 20px;
-            max-height: 500px;
-            overflow-y: auto;
-        }
-        .side-panel.collapsed .side-panel-content {
-            display: none;
-        }
-        .side-panel.collapsed .panel-title {
-            display: none;
-        }
-        .toggle-btn {
-            background: none;
-            border: none;
-            color: white;
-            font-size: 18px;
-            cursor: pointer;
-            transform: rotate(0deg);
-            transition: transform 0.3s ease;
-        }
-        .side-panel.collapsed .toggle-btn {
-            transform: rotate(180deg);
+            flex-direction: column;
+            border-right: 1px solid var(--border);
         }
         .header {
             display: flex;
             align-items: center;
             justify-content: space-between;
-            background: linear-gradient(135deg, #2b6cb0 0%, #3182ce 100%);
+            background: var(--bg-dark);
             color: white;
-            padding: 18px 24px;
-            font-size: 18px;
-            font-weight: 600;
+            padding: 16px 24px;
+            flex-shrink: 0;
         }
         .header-title {
+            font-size: 16px;
+            font-weight: 600;
             display: flex;
             align-items: center;
-            gap: 8px;
+            gap: 10px;
         }
-        .header-title::before {
-            content: "🤖";
-            font-size: 24px;
+        .header-title .dot {
+            width: 8px; height: 8px;
+            background: var(--success);
+            border-radius: 50%;
+            animation: pulse 2s infinite;
         }
+        @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.5} }
         .user-info {
             display: flex;
             align-items: center;
             gap: 12px;
-        }
-        .user-info img {
-            width: 32px;
-            height: 32px;
-            border-radius: 50%;
-            border: 2px solid rgba(255, 255, 255, 0.3);
-        }
-        .user-name {
-            font-weight: 500;
-            font-size: 14px;
-        }
-        .logout-btn {
-            color: rgba(255, 255, 255, 0.9);
-            text-decoration: none;
             font-size: 13px;
-            padding: 6px 12px;
-            border-radius: 6px;
-            background: rgba(255, 255, 255, 0.1);
-            transition: background 0.2s;
         }
-        .logout-btn:hover {
-            background: rgba(255, 255, 255, 0.2);
+        .user-name { color: var(--text-muted); font-weight: 500; }
+        .logout-btn, .clear-btn {
+            color: var(--text-muted);
             text-decoration: none;
-            color: white;
-        }
-        .clear-btn {
-            background: rgba(255, 255, 255, 0.15);
-            color: white;
-            border: none;
-            padding: 6px 10px;
-            border-radius: 5px;
-            font-size: 11px;
+            font-size: 12px;
+            padding: 5px 10px;
+            border-radius: 6px;
+            border: 1px solid var(--bg-dark-3);
+            background: transparent;
             cursor: pointer;
-            transition: background 0.2s;
+            transition: all 0.15s;
         }
-        .clear-btn:hover {
-            background: rgba(255, 255, 255, 0.25);
+        .logout-btn:hover, .clear-btn:hover {
+            background: var(--bg-dark-3);
+            color: white;
         }
         #chat-box {
+            flex: 1;
             padding: 24px;
-            height: 450px;
             overflow-y: auto;
-            background: linear-gradient(to bottom, #f8fafc 0%, #f1f5f9 100%);
-            border-bottom: 1px solid #e2e8f0;
+            background: var(--bg-page);
         }
         .user-msg, .agent-msg, .error-msg, .welcome-msg {
-            margin: 16px 0;
-            padding: 14px 18px;
-            border-radius: 12px;
-            max-width: 80%;
-            line-height: 1.6;
+            margin: 12px 0;
+            padding: 12px 16px;
+            border-radius: var(--radius);
+            max-width: 75%;
             font-size: 14px;
-            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+            line-height: 1.6;
         }
         .user-msg {
-            background: linear-gradient(135deg, #4299e1 0%, #3182ce 100%);
+            background: var(--primary);
             color: white;
             margin-left: auto;
-            text-align: left;
             border-bottom-right-radius: 4px;
         }
-        .user-msg b {
-            color: rgba(255, 255, 255, 0.8);
-            font-weight: 500;
-            font-size: 12px;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-        }
         .agent-msg {
-            background: white;
-            border: 1px solid #e2e8f0;
-            color: #2d3748;
-            margin-right: auto;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            color: var(--text-primary);
             border-bottom-left-radius: 4px;
-        }
-        .agent-msg b {
-            color: #2b6cb0;
-            font-weight: 600;
-            font-size: 12px;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
+            box-shadow: var(--shadow);
         }
         .error-msg {
-            background: #fed7d7;
-            border: 1px solid #fc8181;
-            color: #742a2a;
-            margin-right: auto;
+            background: #fef2f2;
+            border: 1px solid #fecaca;
+            color: #991b1b;
         }
         .welcome-msg {
-            background: linear-gradient(135deg, #e6fffa 0%, #b2f5ea 100%);
-            border: 1px solid #81e6d9;
-            color: #234e52;
-            margin-right: auto;
-            font-style: normal;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            color: var(--text-secondary);
+            box-shadow: var(--shadow);
         }
-        .welcome-msg b {
-            color: #2c7a7b;
+        .msg-label {
+            display: block;
+            font-size: 11px;
             font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 4px;
+            opacity: 0.7;
         }
+        .user-msg .msg-label { color: rgba(255,255,255,0.7); }
+        .agent-msg .msg-label { color: var(--primary); }
         #chat-form {
             display: flex;
-            gap: 12px;
-            border-top: 2px solid #e2e8f0;
-            padding: 20px 24px;
-            background: white;
+            gap: 10px;
+            padding: 16px 24px;
+            background: var(--bg-card);
+            border-top: 1px solid var(--border);
+            flex-shrink: 0;
         }
         #user-input {
             flex: 1;
-            padding: 14px 18px;
-            border: 2px solid #e2e8f0;
-            border-radius: 12px;
+            padding: 12px 16px;
+            border: 2px solid var(--border);
+            border-radius: var(--radius-sm);
             font-size: 14px;
             font-family: inherit;
-            transition: border-color 0.2s, box-shadow 0.2s;
             outline: none;
+            transition: border-color 0.15s;
         }
-        #user-input:focus {
-            border-color: #3182ce;
-            box-shadow: 0 0 0 3px rgba(49, 130, 206, 0.1);
-        }
-        #user-input::placeholder {
-            color: #a0aec0;
-        }
+        #user-input:focus { border-color: var(--primary); }
         button[type="submit"] {
-            background: linear-gradient(135deg, #3182ce 0%, #2b6cb0 100%);
+            background: var(--primary);
             color: white;
             border: none;
-            padding: 14px 24px;
-            border-radius: 12px;
+            padding: 12px 20px;
+            border-radius: var(--radius-sm);
             cursor: pointer;
-            font-size: 14px;
             font-weight: 600;
-            transition: all 0.2s;
-            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-            min-width: 80px;
-        }
-        button[type="submit"]:hover {
-            background: linear-gradient(135deg, #2c5282 0%, #2a4365 100%);
-            transform: translateY(-1px);
-            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
-        }
-        button[type="submit"]:active {
-            transform: translateY(0);
-        }
-        
-        /* Responsive Design */
-        @media (max-width: 1200px) {
-            .main-container {
-                flex-direction: column;
-                max-width: 900px;
-            }
-            .side-panel {
-                width: 100%;
-                min-width: auto;
-                position: static;
-                order: -1;
-            }
-            .side-panel.collapsed {
-                width: 100%;
-                min-width: auto;
-            }
-            .side-panel-content {
-                max-height: 300px;
-            }
-        }
-        
-        @media (max-width: 768px) {
-            .main-container {
-                margin: 10px;
-                padding: 0 10px;
-            }
-            .header {
-                padding: 15px 18px;
-                font-size: 16px;
-            }
-            .user-info {
-                flex-direction: column;
-                gap: 8px;
-                align-items: flex-end;
-            }
-            #chat-box {
-                height: 350px;
-                padding: 18px;
-            }
-            .user-msg, .agent-msg, .error-msg, .welcome-msg {
-                max-width: 90%;
-                font-size: 13px;
-                padding: 12px 15px;
-            }
-            #chat-form {
-                padding: 15px 18px;
-                gap: 8px;
-            }
-            #user-input {
-                font-size: 16px; /* Prevent zoom on iOS */
-            }
-            button[type="submit"] {
-                padding: 14px 18px;
-                min-width: 70px;
-            }
-        }
-        .json-display {
-            background: #1a202c;
-            border: 1px solid #2d3748;
-            border-radius: 8px;
-            padding: 20px;
-            font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Roboto Mono', 'Courier New', monospace;
             font-size: 13px;
-            line-height: 1.5;
-            color: #e2e8f0;
-            white-space: pre-wrap;
-            word-wrap: break-word;
-            max-height: 450px;
+            transition: background 0.15s;
+        }
+        button[type="submit"]:hover { background: var(--primary-hover); }
+
+        /* ===== DEBUG SIDEBAR ===== */
+        .debug-sidebar {
+            width: 540px;
+            min-width: 540px;
+            display: flex;
+            flex-direction: column;
+            background: var(--bg-dark);
+            color: var(--text-light);
+            overflow: hidden;
+            transition: width 0.3s, min-width 0.3s;
+        }
+        .debug-sidebar.collapsed {
+            width: 44px;
+            min-width: 44px;
+        }
+        .debug-sidebar.collapsed .debug-content,
+        .debug-sidebar.collapsed .debug-title { display: none; }
+        .debug-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 16px 18px;
+            border-bottom: 1px solid var(--bg-dark-3);
+            flex-shrink: 0;
+        }
+        .debug-title {
+            font-size: 13px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.8px;
+            color: var(--text-muted);
+        }
+        .debug-toggle {
+            background: none;
+            border: none;
+            color: var(--text-muted);
+            cursor: pointer;
+            font-size: 18px;
+            padding: 4px;
+            border-radius: 4px;
+            transition: color 0.15s;
+            line-height: 1;
+        }
+        .debug-toggle:hover { color: white; }
+        .debug-content {
+            flex: 1;
             overflow-y: auto;
-            box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.1);
+            padding: 16px;
         }
-        .json-display::-webkit-scrollbar {
-            width: 8px;
+        .debug-content::-webkit-scrollbar { width: 6px; }
+        .debug-content::-webkit-scrollbar-track { background: var(--bg-dark); }
+        .debug-content::-webkit-scrollbar-thumb { background: var(--bg-dark-3); border-radius: 3px; }
+
+        /* Flow tree */
+        .flow-section { margin-bottom: 20px; }
+        .flow-section-title {
+            font-size: 11px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: var(--primary);
+            margin-bottom: 12px;
+            padding-bottom: 8px;
+            border-bottom: 1px solid var(--bg-dark-3);
         }
-        .json-display::-webkit-scrollbar-track {
-            background: #2d3748;
-            border-radius: 4px;
-        }
-        .json-display::-webkit-scrollbar-thumb {
-            background: #4a5568;
-            border-radius: 4px;
-        }
-        .json-display::-webkit-scrollbar-thumb:hover {
-            background: #718096;
-        }
-        .loading {
-            text-align: center;
-            color: #718096;
-            font-style: italic;
-            padding: 40px 20px;
-            background: #f8fafc;
-            border-radius: 8px;
-            border: 1px dashed #cbd5e0;
-        }
-        .error {
-            color: #c53030;
-            background: #fed7d7;
-            border: 1px solid #feb2b2;
-            padding: 15px;
-            border-radius: 8px;
-            font-size: 14px;
-            line-height: 1.5;
-        }
-        .refresh-btn {
-            background: linear-gradient(135deg, #38a169 0%, #2f855a 100%);
-            color: white;
-            border: none;
-            padding: 10px 16px;
-            border-radius: 8px;
-            font-size: 13px;
-            font-weight: 600;
+        .flow-node { margin-bottom: 1px; }
+        .flow-node-header {
+            display: flex;
+            align-items: flex-start;
+            gap: 8px;
+            padding: 7px 10px;
+            border-radius: 6px;
             cursor: pointer;
-            margin-bottom: 20px;
-            transition: all 0.2s;
-            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            transition: background 0.1s;
+            user-select: none;
         }
-        .refresh-btn:hover {
-            background: linear-gradient(135deg, #2f855a 0%, #276749 100%);
-            transform: translateY(-1px);
-            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+        .flow-node-header:hover { background: var(--bg-dark-2); }
+        .flow-chevron {
+            width: 12px; height: 12px;
+            flex-shrink: 0;
+            margin-top: 2px;
+            transition: transform 0.2s;
+            color: var(--text-muted);
+        }
+        .flow-node.expanded > .flow-node-header .flow-chevron { transform: rotate(90deg); }
+        .flow-node.leaf > .flow-node-header .flow-chevron { visibility: hidden; }
+        .flow-status {
+            width: 7px; height: 7px;
+            border-radius: 50%;
+            flex-shrink: 0;
+            margin-top: 4px;
+        }
+        .flow-status.success { background: var(--success); }
+        .flow-status.error { background: var(--error); }
+        .flow-status.warn { background: var(--warn); }
+        .flow-label {
+            font-size: 12px;
+            font-weight: 500;
+            color: var(--text-light);
+            flex-shrink: 0;
+        }
+        .flow-detail-inline {
+            font-size: 11px;
+            color: var(--text-muted);
+            font-family: var(--mono);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            max-width: 220px;
+            margin-left: auto;
+        }
+        .flow-children {
+            display: none;
+            margin-left: 20px;
+            padding-left: 12px;
+            border-left: 1px solid var(--bg-dark-3);
+        }
+        .flow-node.expanded > .flow-children { display: block; }
+
+        /* Special: raw token display (long string) */
+        .flow-raw-value {
+            display: none;
+            margin: 4px 0 8px 42px;
+            padding: 10px 12px;
+            background: #0c1222;
+            border: 1px solid var(--bg-dark-3);
+            border-radius: 6px;
+            font-family: var(--mono);
+            font-size: 10px;
+            line-height: 1.5;
+            color: #7dd3fc;
+            word-break: break-all;
+            white-space: pre-wrap;
+            max-height: 160px;
+            overflow-y: auto;
+        }
+        .flow-raw-value::-webkit-scrollbar { width: 4px; }
+        .flow-raw-value::-webkit-scrollbar-thumb { background: var(--bg-dark-3); border-radius: 2px; }
+        .flow-node.expanded > .flow-raw-value { display: block; }
+
+        /* Claim rows in decoded view */
+        .claim-row {
+            display: flex;
+            padding: 3px 0;
+            font-size: 11px;
+            font-family: var(--mono);
+            border-bottom: 1px solid rgba(51,65,85,0.4);
+        }
+        .claim-row:last-child { border-bottom: none; }
+        .claim-key {
+            color: #f472b6;
+            min-width: 90px;
+            font-weight: 500;
+            flex-shrink: 0;
+        }
+        .claim-val {
+            color: #a5d6ff;
+            word-break: break-all;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: var(--text-muted);
+        }
+        .empty-state svg {
+            width: 48px; height: 48px;
+            margin-bottom: 16px;
+            opacity: 0.4;
+        }
+        .empty-state p { font-size: 13px; line-height: 1.6; }
+
+        @media (max-width: 1200px) {
+            .debug-sidebar { width: 420px; min-width: 420px; }
+        }
+        @media (max-width: 1000px) {
+            .main-container { flex-direction: column; height: auto; }
+            .chat-container { border-right: none; height: 55vh; }
+            .debug-sidebar { width: 100%!important; min-width: 100%!important; height: 45vh; }
+            .debug-sidebar.collapsed { height: 44px; }
         }
     </style>
 </head>
 <body>
+{% macro render_flow_node(node) %}
+{% set has_children = node.children is defined and node.children %}
+{% set is_raw_token = (node.label == "Raw JWT" and node.detail and node.detail|length > 100) %}
+<div class="flow-node {{ 'leaf' if (not has_children and not is_raw_token) else '' }}">
+    <div class="flow-node-header" onclick="toggleFlowNode(event, this.parentElement)">
+        <svg class="flow-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M9 5l7 7-7 7"/></svg>
+        <span class="flow-status {{ node.status }}"></span>
+        <span class="flow-label">{{ node.label }}</span>
+        {% if node.detail and not is_raw_token %}
+        <span class="flow-detail-inline" title="{{ node.detail }}">{{ node.detail }}</span>
+        {% endif %}
+    </div>
+    {% if is_raw_token %}
+    <div class="flow-raw-value">{{ node.detail }}</div>
+    {% endif %}
+    {% if has_children %}
+    <div class="flow-children">
+        {% for child in node.children %}
+        {{ render_flow_node(child) }}
+        {% endfor %}
+    </div>
+    {% endif %}
+</div>
+{% endmacro %}
+
 <div class="main-container">
     <div class="chat-container">
         <div class="header">
-            <div class="header-title">Company Assistant</div>
+            <div class="header-title">
+                <span class="dot"></span>
+                Company Assistant
+            </div>
             <div class="user-info">
-                {% if user.picture %}
-                <img src="{{ user.picture }}" alt="User">
-                {% endif %}
                 <span class="user-name">{{ user.name }}</span>
                 <a href="/logout" class="logout-btn">Logout</a>
                 {% if messages %}
-                <form method="POST" action="/clear-chat" style="display: inline;">
-                    <button type="submit" class="clear-btn" onclick="return confirm('Clear all chat messages?')">Clear Chat</button>
+                <form method="POST" action="/clear-chat" style="display:inline;">
+                    <button type="submit" class="clear-btn" onclick="return confirm('Clear all chat messages?')">Clear</button>
                 </form>
                 {% endif %}
             </div>
         </div>
-
         <div id="chat-box">
             {% if not messages %}
             <div class="welcome-msg">
-                <b>Assistant:</b> Hello! I'm your AWS Bedrock AI assistant. How can I help you today?
+                <span class="msg-label">Assistant</span>
+                Hello! I'm your AI assistant. How can I help you today?
             </div>
             {% endif %}
-            
             {% for message in messages %}
             {% if message.sender == 'user' %}
-            <div class="user-msg">
-                <b>You:</b> {{ message.message }}
-            </div>
+            <div class="user-msg"><span class="msg-label">You</span>{{ message.message }}</div>
             {% elif message.sender == 'agent' %}
-            <div class="agent-msg">
-                <b>Assistant:</b> {{ message.message }}
-            </div>
+            <div class="agent-msg"><span class="msg-label">Assistant</span>{{ message.message }}</div>
             {% elif message.sender == 'system' %}
-            <div class="error-msg">
-                <b>Error:</b> {{ message.message }}
-            </div>
+            <div class="error-msg"><span class="msg-label">Error</span>{{ message.message }}</div>
             {% endif %}
             {% endfor %}
         </div>
-
         <form id="chat-form" method="POST">
-            <input type="text" id="user-input" name="message" placeholder="How can I assist you today?" autocomplete="off" required autofocus>
+            <input type="text" id="user-input" name="message" placeholder="Ask something..." autocomplete="off" required autofocus>
             <button type="submit">Send</button>
         </form>
     </div>
 
-    
+    <!-- Debug Sidebar -->
+    <div class="debug-sidebar" id="debugSidebar">
+        <div class="debug-header">
+            <span class="debug-title">Use-Case Flow</span>
+            <button class="debug-toggle" onclick="toggleSidebar()" title="Toggle panel">&laquo;</button>
+        </div>
+        <div class="debug-content">
+            {% if not flow_trace %}
+            <div class="empty-state">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                    <path d="M13 10V3L4 14h7v7l9-11h-7z"/>
+                </svg>
+                <p>Send a message to see the<br>call sequence and token flow here.</p>
+            </div>
+            {% else %}
+            <div class="flow-section">
+                <div class="flow-section-title">Call Sequence</div>
+                {% for step in flow_trace %}
+                {{ render_flow_node(step) }}
+                {% endfor %}
+            </div>
+            {% endif %}
+        </div>
+    </div>
 </div>
 
 <script>
-// Simple script to scroll to bottom after form submission
-{% if messages %}
-document.getElementById('chat-box').scrollTop = document.getElementById('chat-box').scrollHeight;
-{% endif %}
+(function() {
+    var chatBox = document.getElementById('chat-box');
+    if (chatBox) chatBox.scrollTop = chatBox.scrollHeight;
+})();
 
+function toggleSidebar() {
+    var sb = document.getElementById('debugSidebar');
+    sb.classList.toggle('collapsed');
+    var btn = sb.querySelector('.debug-toggle');
+    btn.textContent = sb.classList.contains('collapsed') ? '\u00BB' : '\u00AB';
+}
 
+function toggleFlowNode(e, node) {
+    e.stopPropagation();
+    if (node.classList.contains('leaf')) return;
+    node.classList.toggle('expanded');
+}
 </script>
 </body>
-</html> 
+</html>
