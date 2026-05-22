@@ -11,6 +11,10 @@
 *.zip
 function.zip
 
+# Lambda layers (large dependency bundles, rebuilt from requirements.txt)
+**/layer/
+**/layers/
+
 # -----------------------------------------------------------------------------
 # Byte-compiled / optimized / DLL files
 # -----------------------------------------------------------------------------

@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sign in — Company Assistant</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-page: #f1f5f9;
+            --bg-card: #ffffff;
+            --text-primary: #0f172a;
+            --text-secondary: #64748b;
+            --border: #e2e8f0;
+            --primary: #0f766e;
+            --primary-hover: #0d9488;
+            --primary-light: #ccfbf1;
+            --shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.07), 0 2px 4px -2px rgba(0, 0, 0, 0.05);
+            --radius: 12px;
+        }
+        * {
+            box-sizing: border-box;
+        }
+        body {
+            margin: 0;
+            min-height: 100vh;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: var(--bg-page);
+            color: var(--text-primary);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 24px;
+        }
+        .login-header {
+            text-align: center;
+            margin-bottom: 32px;
+        }
+        .login-header .logo {
+            width: 48px;
+            height: 48px;
+            margin: 0 auto 16px;
+            background: linear-gradient(135deg, var(--primary) 0%, #14b8a6 100%);
+            border-radius: var(--radius);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+            color: white;
+            box-shadow: var(--shadow);
+        }
+        .login-header h1 {
+            font-size: 1.5rem;
+            font-weight: 700;
+            letter-spacing: -0.02em;
+            margin: 0 0 4px;
+            color: var(--text-primary);
+        }
+        .login-header p {
+            font-size: 0.9375rem;
+            color: var(--text-secondary);
+            margin: 0;
+        }
+        .login-card {
+            width: 100%;
+            max-width: 400px;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            box-shadow: var(--shadow);
+            padding: 40px 36px;
+        }
+        .login-card .divider {
+            height: 1px;
+            background: var(--border);
+            margin: 28px 0 24px;
+        }
+        .login-btn {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            width: 100%;
+            padding: 14px 20px;
+            font-size: 0.9375rem;
+            font-weight: 600;
+            font-family: inherit;
+            color: #fff;
+            background: var(--primary);
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            text-decoration: none;
+            transition: background 0.2s, box-shadow 0.2s;
+        }
+        .login-btn:hover {
+            background: var(--primary-hover);
+            box-shadow: 0 2px 8px rgba(15, 118, 110, 0.35);
+        }
+        .login-btn:active {
+            transform: translateY(0);
+        }
+        .login-btn svg {
+            flex-shrink: 0;
+        }
+        .trust-line {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            margin-top: 24px;
+            font-size: 0.8125rem;
+            color: var(--text-secondary);
+        }
+        .trust-line svg {
+            flex-shrink: 0;
+            opacity: 0.8;
+        }
+        footer {
+            margin-top: 48px;
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+        }
+    </style>
+</head>
+<body>
+    <div class="login-header">
+        <div class="logo" aria-hidden="true">
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/></svg>
+        </div>
+        <h1>Company Assistant</h1>
+        <p>Internal chatbot for your organization</p>
+    </div>
+    <div class="login-card">
+        {% if oauth_error %}
+        <p style="margin:0 0 16px; padding:12px 14px; font-size:0.875rem; color:#991b1b; background:#fef2f2; border:1px solid #fecaca; border-radius:8px;">
+            Sign-in could not be completed. Try again, or check the app logs. If this keeps happening, the session cookie may be too large (tokens).
+        </p>
+        {% endif %}
+        <p style="margin:0 0 8px; font-size:0.9375rem; color: var(--text-secondary);">Sign in with your company account to continue.</p>
+        <div class="divider"></div>
+        <a href="/login" class="login-btn">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z"/></svg>
+            Sign in with Okta
+        </a>
+        <p class="trust-line">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+            Secured by your organization’s identity provider
+        </p>
+    </div>
+    <footer>Use only for authorized business purposes.</footer>
+</body>
+</html>

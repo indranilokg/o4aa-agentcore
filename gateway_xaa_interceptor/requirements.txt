@@ -1,0 +1,2 @@
+okta-client-python>=0.1.0
+aiohttp>=3.9.0
