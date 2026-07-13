@@ -121,44 +121,105 @@ self._auth_headers = {
 
 ## 3. Deploy the Lambda
 
-### Option A: Lambda Layer
+### Option A: Lambda Layer (x86_64 / Linux)
+
+`aiohttp` (pulled in by `okta-client-python`) ships native `.so` wheels. Building the layer with a plain `pip install -t` on macOS installs **Darwin/ARM** binaries → Lambda then shows a **blank architecture**, and imports fail with **`invalid ELF header`**.
+
+Build the layer for **Linux x86_64** (same arch as the working function), and publish it with `--compatible-architectures x86_64`.
+
+#### Preferred: Docker (Amazon Linux / SAM build image)
 
 ```bash
 cd gateway_xaa_interceptor
-
-# Build the layer (okta-client-python + aiohttp)
+rm -rf layer xaa-layer.zip
 mkdir -p layer/python
-pip install -r requirements.txt -t layer/python
-cd layer && zip -r ../xaa-layer.zip python && cd ..
 
-# Create the layer
+# Force linux/amd64 so Apple Silicon Macs still produce x86_64 wheels
+docker run --rm --platform linux/amd64 \
+  -v "$PWD":/var/task -w /var/task \
+  public.ecr.aws/sam/build-python3.11 \
+  bash -c 'pip install -r requirements.txt -t layer/python && \
+           find layer/python -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null; true'
+
+cd layer && zip -r ../xaa-layer.zip python && cd ..
+```
+
+#### Alternative: pip cross-compile (no Docker)
+
+Works when every dependency has a `manylinux` wheel (true for current `aiohttp` / `okta-client-python`):
+
+```bash
+cd gateway_xaa_interceptor
+rm -rf layer xaa-layer.zip
+mkdir -p layer/python
+
+pip install -r requirements.txt -t layer/python \
+  --platform manylinux2014_x86_64 \
+  --implementation cp \
+  --python-version 3.11 \
+  --only-binary=:all:
+
+cd layer && zip -r ../xaa-layer.zip python && cd ..
+```
+
+#### Publish the layer (must set architecture)
+
+```bash
 aws lambda publish-layer-version \
   --layer-name okta-xaa-layer \
   --zip-file fileb://xaa-layer.zip \
   --compatible-runtimes python3.11 python3.12 python3.13 \
+  --compatible-architectures x86_64 \
   --region us-east-2
+```
 
-# Create the function
+Note the new version ARN from the response (e.g. `...:layer:okta-xaa-layer:2`). Attach that version to the function.
+
+#### Create / update the function (x86_64)
+
+```bash
 zip -j function.zip lambda_function.py
+
+# First-time create
 aws lambda create-function \
   --function-name agentcore-gateway-xaa-interceptor \
   --runtime python3.11 \
+  --architectures x86_64 \
   --handler lambda_function.lambda_handler \
   --zip-file fileb://function.zip \
   --role arn:aws:iam::YOUR_ACCOUNT:role/YOUR_LAMBDA_ROLE \
   --timeout 30 \
-  --layers arn:aws:lambda:us-east-2:YOUR_ACCOUNT:layer:okta-xaa-layer:1 \
+  --layers arn:aws:lambda:us-east-2:YOUR_ACCOUNT:layer:okta-xaa-layer:NEW_VERSION \
   --environment "Variables={XAA_SECRET_PREFIX=agentcore/xaa}" \
   --region us-east-2
+
+# Or, if the function already exists — point it at the new layer version
+aws lambda update-function-configuration \
+  --function-name agentcore-gateway-xaa-interceptor \
+  --layers arn:aws:lambda:us-east-2:YOUR_ACCOUNT:layer:okta-xaa-layer:NEW_VERSION \
+  --region us-east-2
+
+aws lambda update-function-code \
+  --function-name agentcore-gateway-xaa-interceptor \
+  --zip-file fileb://function.zip \
+  --region us-east-2
+```
+
+**Sanity check before publishing:** native libs in the zip must be ELF, not Mach-O:
+
+```bash
+# Should print "ELF 64-bit LSB shared object, x86-64" (not "Mach-O")
+find layer/python -name '*.so' | head -3 | xargs file
 ```
 
 ### Option B: AWS Console
 
-1. Create a new Lambda function (Python 3.11+, timeout ≥ 30s).
-2. Paste `lambda_function.py` as the handler code.
-3. Create a Lambda Layer from `xaa-layer.zip` and attach it.
-4. Set env var: `XAA_SECRET_PREFIX=agentcore/xaa` (only the prefix, no secrets here).
-5. Handler: `lambda_function.lambda_handler`.
+1. Build `xaa-layer.zip` locally using **Option A** (Docker or pip cross-compile) — do not zip macOS `site-packages`.
+2. Create a new Lambda function (Python 3.11+, **x86_64**, timeout ≥ 30s).
+3. Upload `lambda_function.py` (or `function.zip`) as the handler code.
+4. Create a Lambda Layer from `xaa-layer.zip`, set compatible architectures to **x86_64**, and attach it.
+5. Set env var: `XAA_SECRET_PREFIX=agentcore/xaa` (only the prefix, no secrets here).
+6. Handler: `lambda_function.lambda_handler`.
 
 ## 4. IAM — Lambda execution role
 
@@ -222,15 +283,16 @@ Secrets are cached **in-memory** for the Lambda execution environment lifetime:
 | **Token on MCP target** | Raw `id_token` | Custom AS `access_token` (via XAA) |
 | **Multi-agent** | No | Yes (`X-Agent-ID` + per-agent secrets) |
 | **Secrets** | None | AWS Secrets Manager (one per agent) |
-| **Dependencies** | None (stdlib only) | `okta-client-python`, `aiohttp`, `boto3` |
-| **Deployment** | Single file paste | Layer or container |
+| **Dependencies** | None (stdlib only) | Layer: `okta-client-python`, `aiohttp`. Runtime: `boto3` |
+| **Deployment** | Single file paste | Function zip + **Linux x86_64** Lambda Layer |
 | **Lambda timeout** | Default (3s) OK | ≥ 30s recommended |
 
 ## Troubleshooting
 
-1. **"Secret agentcore/xaa/X not found"** — Secret doesn't exist or name doesn't match `<prefix>/<agent_id>`.
-2. **"Lambda role lacks secretsmanager:GetSecretValue"** — Add the IAM permission (see section 4).
-3. **"No X-Agent-ID header"** — Agent isn't sending the header, or it's not allowlisted on the Gateway.
-4. **XAA exchange fails** — Check private JWK matches the Okta public key, custom AS has the scopes, Cross-App Access is enabled.
-5. **Timeout** — Increase Lambda timeout (≥ 30s); cold start + XAA = two Okta round-trips.
-6. **Gateway 500** — Interceptor attached? `passRequestHeaders: true`? Lambda invoke permission?
+1. **"invalid ELF header" / layer architecture blank** — Layer was built on macOS (Darwin/ARM `.so` files). Rebuild with Docker (`--platform linux/amd64`) or pip `--platform manylinux2014_x86_64`, publish with `--compatible-architectures x86_64`, and attach the new layer version. Confirm with `file` on a `.so` inside `layer/python` (must say `ELF` / `x86-64`).
+2. **"Secret agentcore/xaa/X not found"** — Secret doesn't exist or name doesn't match `<prefix>/<agent_id>`.
+3. **"Lambda role lacks secretsmanager:GetSecretValue"** — Add the IAM permission (see section 4).
+4. **"No X-Agent-ID header"** — Agent isn't sending the header, or it's not allowlisted on the Gateway.
+5. **XAA exchange fails** — Check private JWK matches the Okta public key, custom AS has the scopes, Cross-App Access is enabled.
+6. **Timeout** — Increase Lambda timeout (≥ 30s); cold start + XAA = two Okta round-trips.
+7. **Gateway 500** — Interceptor attached? `passRequestHeaders: true`? Lambda invoke permission?
